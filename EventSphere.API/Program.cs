@@ -18,7 +18,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<EventSphere.Application.Interfaces.INotificationService, EventSphere.Infrastructure.Services.NotificationService>();
 builder.Configuration.AddEnvironmentVariables();
 builder.Services.AddScoped<SmtpEmailSender>();
-DotNetEnv.Env.Load();
 // Add CORS policy for frontend
 builder.Services.AddCors(options =>
 {
