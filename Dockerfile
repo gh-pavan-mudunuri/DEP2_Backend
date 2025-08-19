@@ -11,7 +11,6 @@ RUN dotnet restore
 
 COPY . ./
 
-RUN dotnet ef database update
 RUN dotnet publish "project.csproj" -c Release -o out
 
 # ----------- Runtime stage -----------
