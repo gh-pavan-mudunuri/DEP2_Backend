@@ -23,11 +23,7 @@
     <PackageReference Include="Stripe.net" Version="48.4.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.13.0" />
-    <Compile Include="EventSphere.API/**/*.cs" />
-    <Compile Include="EventSphere.Application/**/*.cs" />
-    <Compile Include="EventSphere.Domain/**/*.cs" />
-    <Compile Include="EventSphere.Infrastructure/**/*.cs" />
-    <Compile Include="Migrations/**/*.cs" />
+   
   </ItemGroup>
 
   
