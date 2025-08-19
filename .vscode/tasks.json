@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "build .NET 8 Web API project",
+			"command": "dotnet build",
+			"args": [],
+			"group": "build",
+			"problemMatcher": [
+				"$msCompile"
+			]
+		}
+	   ,
+	   {
+		   "type": "shell",
+		   "label": "run .NET 8 Web API project",
+		   "command": "dotnet run",
+		   "group": "test",
+		   "problemMatcher": ["$msCompile"]
+	   }
+   ]
+}

@@ -1,0 +1,8 @@
+# Security files
+bin/
+obj/
+appsettings.json
+appsettings.Development.json
+EventSphere.Infrastructure/Helpers/JwtHelper.cs
+EventSphere.Infrastructure/Helpers/SmtpEmailSender.cs
+.env
