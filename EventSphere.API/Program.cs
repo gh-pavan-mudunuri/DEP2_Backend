@@ -25,7 +25,8 @@ builder.Services.AddCors(options =>
         policy => policy
             .WithOrigins(
                 "http://localhost:3000", // Next.js default
-                "http://localhost:5173"  // Vite/React default
+                "http://localhost:5173",
+                https://dep-2-frontend-d1478v9w0-pavans-projects-4424e67e.vercel.app/  // Vite/React default
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
