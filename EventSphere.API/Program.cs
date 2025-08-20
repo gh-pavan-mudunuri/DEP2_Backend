@@ -27,7 +27,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:3000", // Next.js default
                 "http://localhost:5173",
                 "https://dep-2-frontend-d1478v9w0-pavans-projects-4424e67e.vercel.app",
-               "https://dep-2-frontend-jbqpyylbd-pavans-projects-4424e67e.vercel.app"
+               "https://dep-2-frontend-jbqpyylbd-pavans-projects-4424e67e.vercel.app",
+               "dep-2-frontend.vercel.app"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
