@@ -206,8 +206,8 @@ namespace EventSphere.Infrastructure.Repositories
                     Console.WriteLine($"[PAYMENT] Routing payment to organizer StripeAccountId: {organizerStripeAccountId}");
 
                 // Ensure SuccessUrl and CancelUrl are valid URLs
-                string successUrl = request != null && !string.IsNullOrWhiteSpace(request.SuccessUrl) ? request.SuccessUrl : "http://localhost:3000/payment-success";
-                string cancelUrl = request != null && !string.IsNullOrWhiteSpace(request.CancelUrl) ? request.CancelUrl : "http://localhost:3000/payment-cancel";
+                string successUrl = request != null && !string.IsNullOrWhiteSpace(request.SuccessUrl) ? request.SuccessUrl : "dep-2-frontend.vercel.app/payment-success";
+                string cancelUrl = request != null && !string.IsNullOrWhiteSpace(request.CancelUrl) ? request.CancelUrl : "dep-2-frontend.vercel.app/payment-cancel";
 
                 // Diagnostic: throw if URLs are not valid
                 if (!successUrl.StartsWith("http://") && !successUrl.StartsWith("https://"))
