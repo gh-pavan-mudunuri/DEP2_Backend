@@ -21,6 +21,7 @@ namespace backend.Data
         public DbSet<Ticket> Tickets { get; set; }
         public DbSet<WebsiteReview> WebsiteReviews { get; set; }
         public DbSet<EventFeedback> EventFeedbacks { get; set; }
+        // Remove the object EventRegistrations property, use Registrations instead
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
 

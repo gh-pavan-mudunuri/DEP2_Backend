@@ -410,6 +410,11 @@ namespace backend.Services
             return await _eventRepository.GetEventsPagedAsync(page, pageSize);
         }
 
+        public async Task<EventDto?> GetEventByIdNewAsync(int id)
+        {
+            return await _eventRepository.GetEventByIdNewAsync(id);
+        }
+
         public async Task<Event?> GetEventByIdAsync(int id)
         {
             return await _eventRepository.GetEventByIdAsync(id);

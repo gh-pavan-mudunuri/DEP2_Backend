@@ -20,7 +20,6 @@ namespace EventSphere.API.Controllers
         {
             _eventService = eventService;
         }
-            [AllowAnonymous]
             [HttpGet("paged")]
             public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
             {
@@ -42,15 +41,13 @@ namespace EventSphere.API.Controllers
 
 
 
-    [AllowAnonymous]
     [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var evt = await _eventService.GetEventByIdAsync(id);
+            var evt = await _eventService.GetEventByIdNewAsync(id);
             if (evt == null)
                 return NotFound(new { success = false, message = "Event not found" });
-            var dto = EventSphere.Application.Mappers.EventMapper.ToDto(evt);
-            return Ok(new { success = true, data = dto });
+            return Ok(new { success = true, data = evt });
         }
 
 

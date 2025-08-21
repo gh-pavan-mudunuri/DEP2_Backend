@@ -16,6 +16,7 @@ namespace backend.Interfaces
         Task<Event> CreateEventAsync(Event evt, Microsoft.AspNetCore.Http.IFormFile? coverImage, Microsoft.AspNetCore.Http.IFormFile? vibeVideo, List<EventSphere.Application.Dtos.Events.MediaDto>? mediaDtos, List<Microsoft.AspNetCore.Http.IFormFile>? speakerPhotos);
         Task<IEnumerable<Event>> GetAllEventsAsync();
         Task<Event?> GetEventByIdAsync(int id);
+        Task<EventDto?> GetEventByIdNewAsync(int id);
     Task<(IEnumerable<Event> Events, int TotalCount)> GetEventsPagedAsync(int page, int pageSize);
 
     Task<Event?> UpdateEventAsync(int id, EventSphere.Application.Dtos.Events.UpdateEventDto dto, List<Microsoft.AspNetCore.Http.IFormFile>? speakerPhotos = null, bool decrementEditCount = true);

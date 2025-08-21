@@ -16,6 +16,18 @@ namespace EventSphere.Infrastructure.Repositories
         {
             _context = context;
         }
+         public async Task<Event?> GetEventByIdAsync(int id)
+        {
+            return await _context.Events
+                .Include(e => e.Speakers)
+                .Include(e => e.Occurrences)
+                .Include(e => e.Faqs)
+                .Include(e => e.Media)
+                .Include(e => e.Registrations)
+                .FirstOrDefaultAsync(e => e.EventId == id);
+        }
+
+        
         public async Task<(IEnumerable<EventCardDto> Events, int TotalCount)> GetUnapprovedEventsPagedAsync(int page, int pageSize)
         {
             var query = _context.Events
@@ -47,15 +59,120 @@ namespace EventSphere.Infrastructure.Repositories
         }
 
 
-        public async Task<Event?> GetEventByIdAsync(int id)
+        public async Task<EventDto?> GetEventByIdNewAsync(int id)
+{
+    // Get the event (scalar fields only)
+    var evnt = await _context.Events
+        .AsNoTracking()
+        .FirstOrDefaultAsync(e => e.EventId == id);
+
+    if (evnt == null)
+        return null;
+
+    // FAQs
+    var faqs = await _context.EventFaqs
+        .AsNoTracking()
+        .Where(f => f.EventId == id)
+        .Select(f => new EventFaqDto
         {
-            // Load all related entities, but use AsNoTracking for performance
-            return await _context.Events
-                .AsNoTracking()
-                .Include(e => e.Speakers)
-                .Include(e => e.Occurrences)
-                .Include(e => e.Faqs)
-                .FirstOrDefaultAsync(e => e.EventId == id);
+            FaqId = f.FaqId,
+            Question = f.Question,
+            Answer = f.Answer
+        })
+        .ToListAsync();
+
+    // Speakers
+    var speakers = await _context.EventSpeakers
+        .AsNoTracking()
+        .Where(s => s.EventId == id)
+        .Select(s => new EventSpeakerDto
+        {
+            SpeakerId = s.SpeakerId,
+            Name = s.Name,
+            Bio = s.Bio,
+            PhotoUrl = s.PhotoUrl
+        })
+        .ToListAsync();
+
+    // Occurrences
+    var occurrences = await _context.EventOccurrences
+        .AsNoTracking()
+        .Where(o => o.EventId == id)
+        .Select(o => new EventOccurrenceDto
+        {
+            OccurrenceId = o.OccurrenceId,
+            StartTime = o.StartTime,
+            EndTime = o.EndTime,
+            EventTitle = o.EventTitle,
+            IsCancelled = o.IsCancelled
+        })
+        .ToListAsync();
+
+    // Media
+    var media = await _context.EventMedias
+        .AsNoTracking()
+        .Where(m => m.EventId == id)
+        .Select(m => new EventMediaDto
+        {
+            MediaId = m.MediaId,
+            MediaUrl = m.MediaUrl,
+            MediaType = m.MediaType.ToString(),
+            Description = m.Description
+        })
+        .ToListAsync();
+
+    // Registrations count
+    var registrationCount = await _context.Registrations
+        .AsNoTracking()
+        .CountAsync(r => r.EventId == id);
+
+    // Build DTO
+    var result = new EventDto
+    {
+        EventId = evnt.EventId,
+        OrganizerId = evnt.OrganizerId,
+        Title = evnt.Title,
+        CoverImage = evnt.CoverImage,
+        VibeVideoUrl = evnt.VibeVideoUrl,
+        Category = evnt.Category,
+        Location = evnt.Location,
+        EventType = evnt.EventType.ToString(),
+        RegistrationDeadline = evnt.RegistrationDeadline,
+        EventStart = evnt.EventStart,
+        EventEnd = evnt.EventEnd,
+        IsRecurring = evnt.IsRecurring,
+        RecurrenceType = evnt.RecurrenceType,
+        RecurrenceRule = evnt.RecurrenceRule,
+        CustomFields = evnt.CustomFields,
+        Description = evnt.Description,
+        IsPaidEvent = evnt.IsPaidEvent,
+        Price = evnt.Price,
+        EventLink = evnt.EventLink,
+        OrganizerName = evnt.OrganizerName,
+        OrganizerEmail = evnt.OrganizerEmail,
+        MaxAttendees = evnt.MaxAttendees,
+        EditEventCount = evnt.EditEventCount,
+        Occurrences = occurrences,
+        Speakers = speakers,
+        Faqs = faqs,
+        Media = media,
+        RegistrationCount = registrationCount,
+        IsVerifiedByAdmin = evnt.IsVerifiedByAdmin
+    };
+
+    return result;
+}
+
+
+
+        private EventDto? NotFound()
+        {
+            throw new NotImplementedException();
+        }
+
+        private EventDto? Ok(object result)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task<IEnumerable<Event>> GetAllEventsAsync()

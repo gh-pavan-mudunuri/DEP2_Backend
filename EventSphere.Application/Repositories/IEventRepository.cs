@@ -7,7 +7,10 @@ namespace EventSphere.Application.Repositories
 {
     public interface IEventRepository
     {
+        Task<EventDto?> GetEventByIdNewAsync(int id);
+
         Task<Event?> GetEventByIdAsync(int id);
+
         Task<IEnumerable<Event>> GetAllEventsAsync();
     Task<(IEnumerable<Event> Events, int TotalCount)> GetEventsPagedAsync(int page, int pageSize);
 
