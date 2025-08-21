@@ -49,12 +49,12 @@ namespace EventSphere.Infrastructure.Repositories
 
         public async Task<Event?> GetEventByIdAsync(int id)
         {
+            // Load all related entities, but use AsNoTracking for performance
             return await _context.Events
+                .AsNoTracking()
                 .Include(e => e.Speakers)
                 .Include(e => e.Occurrences)
                 .Include(e => e.Faqs)
-                .Include(e => e.Media)
-                .Include(e => e.Registrations)
                 .FirstOrDefaultAsync(e => e.EventId == id);
         }
 
