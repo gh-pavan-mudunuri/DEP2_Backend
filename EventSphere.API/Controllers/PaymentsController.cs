@@ -52,9 +52,9 @@ public class PaymentsController : ControllerBase
 
             // Ensure SuccessUrl and CancelUrl are valid URLs
             if (string.IsNullOrWhiteSpace(request.SuccessUrl))
-                request.SuccessUrl = "http://localhost:3000/payment-success";
+                request.SuccessUrl = "https://dep-2-frontend.vercel.app/payment-success";
             if (string.IsNullOrWhiteSpace(request.CancelUrl))
-                request.CancelUrl = "http://localhost:3000/payment-cancel";
+                request.CancelUrl = "https://dep-2-frontend.vercel.app/payment-cancel";
 
             var response = await _paymentService.CreateCheckoutSessionAsync(request);
             if (response == null || string.IsNullOrEmpty(response.Url))
