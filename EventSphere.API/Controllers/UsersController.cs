@@ -71,8 +71,8 @@ namespace EventSphere.API.Controllers
                 if (user == null)
                     return NotFound(new { success = false, message = "User not found." });
 
-                var returnUrl = "http://localhost:3000/stripe-onboarding-success";
-                var refreshUrl = "http://localhost:3000/stripe-onboarding-start";
+                var returnUrl = "https://dep-2-frontend.vercel.app/stripe-onboarding-success";
+                var refreshUrl = "https://dep-2-frontend.vercel.app/stripe-onboarding-start";
 
                 var (accountId, onboardingUrl) = await _paymentRepository.CreateStripeExpressAccountAsync(dto.Email, returnUrl, refreshUrl);
 
