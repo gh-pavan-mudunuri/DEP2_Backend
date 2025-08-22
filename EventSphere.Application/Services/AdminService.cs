@@ -1,7 +1,6 @@
 using backend.Interfaces;
 using EventSphere.Application.Dtos.Events;
 using EventSphere.Application.Repositories;
-using EventSphere.Domain.Entities;
 using EventSphere.Domain.Enums;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +19,7 @@ namespace backend.Services
 
         public async Task<IActionResult> AproveEventEditAsync(int id)
 {
-    var existing = await _eventRepository.GetEventByIdNewAsync(id);
+    var existing = await _eventRepository.GetEventByIdAsync(id);
     if (existing == null)
         throw new KeyNotFoundException("Event not found");
 
@@ -35,8 +34,8 @@ namespace backend.Services
             if (dto.Title != null) existing.Title = dto.Title;
             if (dto.Description != null) existing.Description = dto.Description;
             if (dto.Category != null) existing.Category = dto.Category;
-            if (dto.EventType != null)
-                existing.EventType = dto.EventType;
+            if (dto.EventType != null && Enum.TryParse<EventType>(dto.EventType, true, out var parsedType))
+                existing.EventType = parsedType;
             if (dto.Location != null) existing.Location = dto.Location;
             if (dto.RegistrationDeadline.HasValue) existing.RegistrationDeadline = dto.RegistrationDeadline.Value;
             if (dto.EventStart.HasValue) existing.EventStart = dto.EventStart.Value;
@@ -65,37 +64,7 @@ namespace backend.Services
     existing.AdminVerifiedAt = DateTime.UtcNow;
     existing.EditEventCount = 0;
 
-    var eventEntity = new Event
-{
-    EventId = existing.EventId,
-    OrganizerId = existing.OrganizerId,
-    Title = existing.Title,
-    CoverImage = existing.CoverImage,
-    VibeVideoUrl = existing.VibeVideoUrl,
-    Category = existing.Category,
-    Location = existing.Location,
-    EventType = Enum.TryParse<EventType>(existing.EventType, out var eventTypeEnum) ? eventTypeEnum : EventType.TBA,
-    RegistrationDeadline = existing.RegistrationDeadline,
-    EventStart = existing.EventStart,
-    EventEnd = existing.EventEnd,
-    IsRecurring = existing.IsRecurring,
-    RecurrenceType = existing.RecurrenceType,
-    RecurrenceRule = existing.RecurrenceRule,
-    CustomFields = existing.CustomFields,
-    Description = existing.Description,
-    IsPaidEvent = existing.IsPaidEvent,
-    Price = existing.Price,
-    EventLink = existing.EventLink,
-    OrganizerName = existing.OrganizerName,
-    OrganizerEmail = existing.OrganizerEmail,
-    MaxAttendees = existing.MaxAttendees,
-    EditEventCount = existing.EditEventCount,
-    IsVerifiedByAdmin = existing.IsVerifiedByAdmin,
-    AdminVerifiedAt = existing.AdminVerifiedAt
-    // Add mapping for child collections if needed
-};
-
-    await _eventRepository.UpdateEventAsync(eventEntity);
+    await _eventRepository.UpdateEventAsync(existing);
 
     return new OkObjectResult(new { success = true, message = "Event edit approved" });
 }
