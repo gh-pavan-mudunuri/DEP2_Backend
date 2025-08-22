@@ -3,6 +3,7 @@ using EventSphere.Application.Dtos;
 using EventSphere.Application.Interfaces;
 using EventSphere.Application.Repositories;
 using EventSphere.Domain.Entities;
+using EventSphere.Domain.Enums;
 
 namespace backend.Services
 {
@@ -44,10 +45,10 @@ namespace backend.Services
         {
             var bookmarkedEventIds = await _bookmarkRepository.GetAllBookmarkEventsIdByUserIdAsync(userId);
 
-            var events = new List<Event>();
+            var events = new List<EventDto>();
             foreach (var eventId in bookmarkedEventIds)
             {
-                var ev = await _eventRepository.GetEventByIdAsync(eventId);
+                var ev = await _eventRepository.GetEventByIdNewAsync(eventId);
                 if (ev != null)
                 {
                     events.Add(ev);
@@ -66,7 +67,7 @@ namespace backend.Services
                     Title = e.Title,
                     CoverImage = e.CoverImage,
                     Category = e.Category,
-                    EventType = e.EventType,
+                    EventType = !string.IsNullOrEmpty(e.EventType) && Enum.TryParse<EventType>(e.EventType, out var eventTypeEnum) ? eventTypeEnum : EventType.TBA,
                     Location = e.Location,
                     RegistrationDeadline = e.RegistrationDeadline,
                     EventStart = e.EventStart,

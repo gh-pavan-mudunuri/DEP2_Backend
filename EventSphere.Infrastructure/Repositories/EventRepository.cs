@@ -47,6 +47,7 @@ namespace EventSphere.Infrastructure.Repositories
                     IsVerifiedByAdmin = e.IsVerifiedByAdmin,
                     RegistrationCount = e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0,
                     OrganizerEmail = e.OrganizerEmail
+                    
                 });
 
             var totalCount = await query.CountAsync();
@@ -157,7 +158,8 @@ namespace EventSphere.Infrastructure.Repositories
         Faqs = faqs,
         Media = media,
         RegistrationCount = registrationCount,
-        IsVerifiedByAdmin = evnt.IsVerifiedByAdmin
+        IsVerifiedByAdmin = evnt.IsVerifiedByAdmin,
+        AdminVerifiedAt = evnt.AdminVerifiedAt ?? DateTime.MinValue
     };
 
     return result;
@@ -314,14 +316,16 @@ public async Task<List<Event>> GetTrendingEventsAsync()
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteEventAsync(int id)
+        public async Task<bool> DeleteEventAsync(int id)
         {
             var ev = await _context.Events.FindAsync(id);
-            if (ev != null)
+            if (ev == null)
             {
-                _context.Events.Remove(ev);
-                await _context.SaveChangesAsync();
+                return false;
             }
+            _context.Events.Remove(ev);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         public async Task<int> GetRegistrationCountForEventAsync(int eventId)

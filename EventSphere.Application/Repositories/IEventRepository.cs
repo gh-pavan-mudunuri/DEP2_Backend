@@ -23,7 +23,7 @@ namespace EventSphere.Application.Repositories
         Task<List<Event>> GetTrendingEventsAsync();
 
 
-        Task DeleteEventAsync(int id);
+    Task<bool> DeleteEventAsync(int id);
         // Add more event-related methods as needed
 
         Task<int> GetRegistrationCountForEventAsync(int eventId);

@@ -36,5 +36,6 @@ namespace EventSphere.Application.Dtos
     // Added: total tickets booked for this event
     public int RegistrationCount { get; set; }
         public bool IsVerifiedByAdmin { get; set; }
+        public DateTime AdminVerifiedAt { get; internal set; }
     }
 }

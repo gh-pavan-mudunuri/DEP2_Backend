@@ -97,11 +97,11 @@ namespace backend.Services
 
             // Extract video URLs from the description
             var videoUrls = new List<string>();
-            if (!string.IsNullOrEmpty(dto.Description))
+            if (dto.Description != null)
             {
                 // Extract base64 video data from <video src="data:video/mp4;base64,...">
                 var base64VideoMatches = System.Text.RegularExpressions.Regex.Matches(
-                    dto.Description,
+                    dto.Description ?? string.Empty,
                     "<video[^>]*src=\\\"data:video/(?<ext>mp4|webm|mov|avi|mkv);base64,(?<data>[A-Za-z0-9+/=]+)\\\"[^>]*>",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 int base64Index = 1;
@@ -134,7 +134,7 @@ namespace backend.Services
 
                 // Simple regex for video URLs (mp4, webm, mov, avi, mkv)
                 var matches = System.Text.RegularExpressions.Regex.Matches(
-                    dto.Description,
+                    dto.Description ?? string.Empty,
                     @"https?://[^\s'""]+\.(mp4|webm|mov|avi|mkv)",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 foreach (System.Text.RegularExpressions.Match match in matches)
@@ -422,209 +422,233 @@ namespace backend.Services
 
         public async Task<Event?> UpdateEventAsync(int id, UpdateEventDto dto, List<IFormFile>? speakerPhotos = null, bool decrementEditCount = true)
         {
-            var existing = await _eventRepository.GetEventByIdAsync(id);
-            if (existing == null)
+            // Use GetEventByIdNewAsync (returns EventDto)
+            var eventDto = await _eventRepository.GetEventByIdNewAsync(id);
+            if (eventDto == null)
                 return null;
 
-            if (decrementEditCount && existing.EditEventCount < 0)
-                throw new InvalidOperationException("Edit limit exceeded, Last Edit is not approved by Admin Yet.");
-            if (existing.EditEventCount == 0 && decrementEditCount)
+            // Convert EventDto to Event entity for update
+            var eventEntity = new Event
             {
-                // Store incoming dto data into CustomFields as JSON
-                existing.CustomFields = System.Text.Json.JsonSerializer.Serialize(dto);
-                existing.EditEventCount = -1;
-                existing.IsVerifiedByAdmin = false;
+                EventId = eventDto.EventId,
+                Title = dto.Title ?? eventDto.Title ?? string.Empty,
+                Description = dto.Description ?? eventDto.Description ?? string.Empty,
+                Category = dto.Category ?? eventDto.Category ?? string.Empty,
+                EventType = !string.IsNullOrEmpty(dto.EventType) && Enum.TryParse<EventSphere.Domain.Enums.EventType>(dto.EventType, true, out var parsedType) ? parsedType : (Enum.TryParse<EventSphere.Domain.Enums.EventType>(eventDto.EventType, true, out var fallbackType) ? fallbackType : EventSphere.Domain.Enums.EventType.TBA),
+                Location = dto.Location ?? eventDto.Location ?? string.Empty,
+                RegistrationDeadline = dto.RegistrationDeadline ?? eventDto.RegistrationDeadline,
+                EventStart = dto.EventStart ?? eventDto.EventStart,
+                EventEnd = dto.EventEnd ?? eventDto.EventEnd,
+                IsPaidEvent = dto.IsPaidEvent ?? eventDto.IsPaidEvent,
+                Price = dto.Price ?? eventDto.Price,
+                MaxAttendees = dto.MaxAttendees ?? eventDto.MaxAttendees,
+                OrganizerName = dto.OrganizerName ?? eventDto.OrganizerName ?? string.Empty,
+                OrganizerEmail = dto.OrganizerEmail ?? eventDto.OrganizerEmail ?? string.Empty,
+                EventLink = dto.EventLink ?? eventDto.EventLink,
+                RecurrenceType = dto.RecurrenceType ?? eventDto.RecurrenceType,
+                RecurrenceRule = dto.RecurrenceRule ?? eventDto.RecurrenceRule,
+                CustomFields = !string.IsNullOrWhiteSpace(dto.CustomFields) ? dto.CustomFields : eventDto.CustomFields,
+                UpdatedAt = DateTime.UtcNow,
+                // CreatedAt = eventDto.CreatedAt, // Remove if not present in DTO
+                EditEventCount = eventDto.EditEventCount,
+                IsVerifiedByAdmin = eventDto.IsVerifiedByAdmin,
+                OrganizerId = eventDto.OrganizerId,
+                CoverImage = eventDto.CoverImage,
+                VibeVideoUrl = eventDto.VibeVideoUrl,
+                IsRecurring = eventDto.IsRecurring,
+                // Media, Faqs, Occurrences, Speakers will be handled below
+            };
+
+            // Edit count logic
+            if (decrementEditCount && eventDto.EditEventCount < 0)
+                throw new InvalidOperationException("Edit limit exceeded, Last Edit is not approved by Admin Yet.");
+            if (eventDto.EditEventCount == 0 && decrementEditCount)
+            {
+                eventEntity.CustomFields = System.Text.Json.JsonSerializer.Serialize(dto);
+                eventEntity.EditEventCount = -1;
+                eventEntity.IsVerifiedByAdmin = false;
             }
             else
             {
+                eventEntity.EditEventCount = decrementEditCount ? eventDto.EditEventCount - 1 : eventDto.EditEventCount;
+            }
 
-                if (dto.Title != null) existing.Title = dto.Title;
-                if (dto.Description != null) existing.Description = dto.Description;
-                if (dto.Category != null) existing.Category = dto.Category;
-                if (dto.EventType != null)
+            // Handle file uploads for edit
+            if (dto.CoverImage != null)
+            {
+                eventEntity.CoverImage = await FileHelper.SaveFileAsync(dto.CoverImage, "covers");
+            }
+            if (dto.VibeVideo != null)
+            {
+                eventEntity.VibeVideoUrl = await FileHelper.SaveFileAsync(dto.VibeVideo, "videos");
+            }
+
+            // Occurrences
+            if (!string.IsNullOrEmpty(eventEntity.RecurrenceType) && eventEntity.RecurrenceType.ToLower() == "rule" && !string.IsNullOrEmpty(eventEntity.RecurrenceRule))
+            {
+                var occurrences = new List<EventOccurrence>();
+                var mainTitle = eventEntity.Title ?? string.Empty;
+                occurrences.Add(new EventOccurrence
                 {
-                    if (Enum.TryParse<EventSphere.Domain.Enums.EventType>(dto.EventType, true, out var parsedType))
+                    StartTime = eventEntity.EventStart,
+                    EndTime = eventEntity.EventEnd,
+                    EventTitle = mainTitle,
+                    EventId = eventEntity.EventId
+                });
+                var rule = eventEntity.RecurrenceRule.ToUpper();
+                string freq = "DAILY";
+                foreach (var part in rule.Split(';'))
+                {
+                    if (part.StartsWith("FREQ=")) freq = part.Substring(5);
+                }
+                var duration = eventEntity.EventEnd - eventEntity.EventStart;
+                var start = eventEntity.EventStart;
+                for (int i = 1; i < 10; i++)
+                {
+                    if (freq == "DAILY")
                     {
-                        existing.EventType = parsedType;
+                        occurrences.Add(new EventOccurrence
+                        {
+                            StartTime = start.AddDays(i),
+                            EndTime = start.AddDays(i).Add(duration),
+                            EventTitle = mainTitle,
+                            EventId = eventEntity.EventId
+                        });
                     }
-                }
-                if (dto.Location != null) existing.Location = dto.Location;
-                if (dto.RegistrationDeadline.HasValue) existing.RegistrationDeadline = dto.RegistrationDeadline.Value;
-                if (dto.EventStart.HasValue) existing.EventStart = dto.EventStart.Value;
-                if (dto.EventEnd.HasValue) existing.EventEnd = dto.EventEnd.Value;
-                if (dto.IsPaidEvent.HasValue) existing.IsPaidEvent = dto.IsPaidEvent.Value;
-                if (dto.Price.HasValue) existing.Price = dto.Price.Value;
-                if (dto.MaxAttendees.HasValue) existing.MaxAttendees = dto.MaxAttendees.Value;
-
-                if (dto.OrganizerName != null) existing.OrganizerName = dto.OrganizerName;
-                if (dto.OrganizerEmail != null) existing.OrganizerEmail = dto.OrganizerEmail;
-                if (dto.EventLink != null) existing.EventLink = dto.EventLink;
-                if (dto.RecurrenceType != null) existing.RecurrenceType = dto.RecurrenceType;
-                if (dto.RecurrenceRule != null) existing.RecurrenceRule = dto.RecurrenceRule;
-
-
-                // Handle CustomFields (OtherCategory) update
-                if ((dto.Category?.ToLower() == "others" || dto.Category?.ToLower() == "other") && !string.IsNullOrWhiteSpace(dto.CustomFields))
-                {
-                    existing.CustomFields = dto.CustomFields;
-                }
-                else if (!string.IsNullOrWhiteSpace(dto.CustomFields))
-                {
-                    existing.CustomFields = dto.CustomFields;
-                }
-
-                existing.UpdatedAt = DateTime.UtcNow;
-
-                // Handle file uploads for edit
-                if (dto.CoverImage != null)
-                {
-                    existing.CoverImage = await FileHelper.SaveFileAsync(dto.CoverImage, "covers");
-                }
-                if (dto.VibeVideo != null)
-                {
-                    existing.VibeVideoUrl = await FileHelper.SaveFileAsync(dto.VibeVideo, "videos");
-                }
-
-
-                // --- Always replace Occurrences, Speakers, and Faqs with new lists from DTO ---
-                // Occurrences
-                // If recurrenceType is 'rule', generate occurrences from recurrenceRule (like create)
-                if (!string.IsNullOrEmpty(existing.RecurrenceType) && existing.RecurrenceType.ToLower() == "rule" && !string.IsNullOrEmpty(existing.RecurrenceRule))
-                {
-                    // Generate up to 10 occurrences based on the rule
-                    var occurrences = new List<EventOccurrence>();
-                    var mainTitle = existing.Title ?? string.Empty;
-                    // Always add the main event's start/end as the first occurrence
-                    occurrences.Add(new EventOccurrence
+                    else if (freq == "WEEKLY")
                     {
-                        StartTime = existing.EventStart,
-                        EndTime = existing.EventEnd,
-                        EventTitle = mainTitle,
-                        EventId = existing.EventId
-                    });
-                    var rule = existing.RecurrenceRule.ToUpper();
-                    string freq = "DAILY";
-                    foreach (var part in rule.Split(';'))
-                    {
-                        if (part.StartsWith("FREQ=")) freq = part.Substring(5);
-                    }
-                    var duration = existing.EventEnd - existing.EventStart;
-                    var start = existing.EventStart;
-                    for (int i = 1; i < 10; i++) // start from 1 to avoid duplicating the main event occurrence
-                    {
-                        if (freq == "DAILY")
+                        occurrences.Add(new EventOccurrence
                         {
-                            occurrences.Add(new EventOccurrence
-                            {
-                                StartTime = start.AddDays(i),
-                                EndTime = start.AddDays(i).Add(duration),
-                                EventTitle = mainTitle,
-                                EventId = existing.EventId
-                            });
-                        }
-                        else if (freq == "WEEKLY")
-                        {
-                            occurrences.Add(new EventOccurrence
-                            {
-                                StartTime = start.AddDays(i * 7),
-                                EndTime = start.AddDays(i * 7).Add(duration),
-                                EventTitle = mainTitle,
-                                EventId = existing.EventId
-                            });
-                        }
-                        // Add more FREQ support as needed
-                    }
-                    existing.Occurrences = occurrences;
-                }
-                else if (dto.Occurrences != null)
-                {
-                    existing.Occurrences = dto.Occurrences.Select(o => new EventOccurrence
-                    {
-                        StartTime = o.StartTime ?? DateTime.UtcNow,
-                        EndTime = o.EndTime ?? DateTime.UtcNow,
-                        EventTitle = o.EventTitle,
-                        EventId = existing.EventId
-                    }).ToList();
-                }
-                // Speakers
-                if (dto.Speakers != null)
-                {
-                    existing.Speakers = new List<EventSpeaker>();
-                    // Build a dictionary of speaker image files by index (from file name: speakers[0].image, speakers[1].image, ...)
-                    var speakerPhotoDict = new Dictionary<int, IFormFile>();
-                    if (speakerPhotos != null)
-                    {
-                        foreach (var file in speakerPhotos)
-                        {
-                            // Try to extract the index from the file name
-                            var match = System.Text.RegularExpressions.Regex.Match(file.Name, @"speakers\[(\d+)\]\\?.*image");
-                            if (match.Success && int.TryParse(match.Groups[1].Value, out int idx))
-                            {
-                                speakerPhotoDict[idx] = file;
-                            }
-                        }
-                    }
-                    for (int i = 0; i < dto.Speakers.Count; i++)
-                    {
-                        var s = dto.Speakers[i];
-                        string photoUrl = !string.IsNullOrEmpty(s.PhotoUrl) ? s.PhotoUrl : "/uploads/speakers/default-profile.png";
-                        // Only update PhotoUrl if a new file is uploaded for this speaker index
-                        if (speakerPhotoDict.TryGetValue(i, out var file) && file != null)
-                        {
-                            var fileName = await FileHelper.SaveFileAsync(file, "speakers");
-                            photoUrl = "/uploads/speakers/" + System.IO.Path.GetFileName(fileName);
-                        }
-                        existing.Speakers.Add(new EventSpeaker
-                        {
-                            Name = s.Name,
-                            Bio = s.Bio,
-                            PhotoUrl = photoUrl,
-                            EventId = existing.EventId,
-                            EventTitle = existing.Title
+                            StartTime = start.AddDays(i * 7),
+                            EndTime = start.AddDays(i * 7).Add(duration),
+                            EventTitle = mainTitle,
+                            EventId = eventEntity.EventId
                         });
                     }
                 }
-                // Faqs
-                if (dto.Faqs != null)
+                eventEntity.Occurrences = occurrences;
+            }
+            else if (dto.Occurrences != null)
+            {
+                eventEntity.Occurrences = dto.Occurrences.Select(o => new EventOccurrence
                 {
-                    existing.Faqs = dto.Faqs.Select(f => new EventFaq
-                    {
-                        Question = f.Question,
-                        Answer = f.Answer,
-                        EventId = existing.EventId,
-                        EventTitle = existing.Title
-                    }).ToList();
-                }
-                existing.EditEventCount = decrementEditCount ? existing.EditEventCount - 1 : existing.EditEventCount;
+                    StartTime = ((System.Nullable<System.DateTime>)o.StartTime).HasValue ? ((System.Nullable<System.DateTime>)o.StartTime).Value : DateTime.UtcNow,
+                    EndTime = ((System.Nullable<System.DateTime>)o.EndTime).HasValue ? ((System.Nullable<System.DateTime>)o.EndTime).Value : DateTime.UtcNow,
+                    EventTitle = o.EventTitle,
+                    EventId = eventEntity.EventId
+                }).ToList();
+            }
+            else if (eventDto.Occurrences != null)
+            {
+                eventEntity.Occurrences = eventDto.Occurrences.Select(o => new EventOccurrence
+                {
+                    StartTime = ((System.Nullable<System.DateTime>)o.StartTime).HasValue ? ((System.Nullable<System.DateTime>)o.StartTime).Value : DateTime.UtcNow,
+                    EndTime = ((System.Nullable<System.DateTime>)o.EndTime).HasValue ? ((System.Nullable<System.DateTime>)o.EndTime).Value : DateTime.UtcNow,
+                    EventTitle = o.EventTitle,
+                    EventId = eventEntity.EventId
+                }).ToList();
             }
 
+            // Speakers
+            if (dto.Speakers != null)
+            {
+                eventEntity.Speakers = new List<EventSpeaker>();
+                var speakerPhotoDict = new Dictionary<int, IFormFile>();
+                if (speakerPhotos != null)
+                {
+                    foreach (var file in speakerPhotos)
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(file.Name, @"speakers\[(\d+)\]\\?.*image");
+                        if (match.Success && int.TryParse(match.Groups[1].Value, out int idx))
+                        {
+                            speakerPhotoDict[idx] = file;
+                        }
+                    }
+                }
+                for (int i = 0; i < dto.Speakers.Count; i++)
+                {
+                    var s = dto.Speakers[i];
+                    string photoUrl = !string.IsNullOrEmpty(s.PhotoUrl) ? s.PhotoUrl : "/uploads/speakers/default-profile.png";
+                    if (speakerPhotoDict.TryGetValue(i, out var file) && file != null)
+                    {
+                        var fileName = await FileHelper.SaveFileAsync(file, "speakers");
+                        photoUrl = "/uploads/speakers/" + System.IO.Path.GetFileName(fileName);
+                    }
+                    eventEntity.Speakers.Add(new EventSpeaker
+                    {
+                        Name = s.Name,
+                        Bio = s.Bio,
+                        PhotoUrl = photoUrl,
+                        EventId = eventEntity.EventId,
+                        EventTitle = eventEntity.Title
+                    });
+                }
+            }
+            else
+            {
+                eventEntity.Speakers = eventDto.Speakers?.Select(s => new EventSpeaker
+                {
+                    Name = s.Name,
+                    Bio = s.Bio,
+                    PhotoUrl = s.PhotoUrl,
+                    EventId = eventEntity.EventId,
+                    EventTitle = eventEntity.Title
+                }).ToList();
+            }
 
+            // Faqs
+            if (dto.Faqs != null)
+            {
+                eventEntity.Faqs = dto.Faqs.Select(f => new EventFaq
+                {
+                    Question = f.Question,
+                    Answer = f.Answer,
+                    EventId = eventEntity.EventId,
+                    EventTitle = eventEntity.Title
+                }).ToList();
+            }
+            else
+            {
+                eventEntity.Faqs = eventDto.Faqs?.Select(f => new EventFaq
+                {
+                    Question = f.Question,
+                    Answer = f.Answer,
+                    EventId = eventEntity.EventId,
+                    EventTitle = eventEntity.Title
+                }).ToList();
+            }
 
-            await _eventRepository.UpdateEventAsync(existing);
+            // Media
+            eventEntity.Media = eventDto.Media?.Select(m => new EventMedia
+            {
+                MediaId = m.MediaId,
+                MediaType = MapMediaTypeWithDebug(m.MediaType, m.MediaUrl),
+                MediaUrl = m.MediaUrl,
+                Description = m.Description,
+                EventId = eventEntity.EventId,
+                EventTitle = eventEntity.Title
+            }).ToList();
 
-            // Notify all registered users about the event update
-            var registrations = await _eventRepository.GetRegistrationsByEventIdAsync(existing.EventId);
+            await _eventRepository.UpdateEventAsync(eventEntity);
+
+            var registrations = await _eventRepository.GetRegistrationsByEventIdAsync(eventEntity.EventId);
             foreach (var reg in registrations)
             {
                 if (!string.IsNullOrWhiteSpace(reg.UserEmail))
                 {
-                    var subject = $"Event Updated: {existing.Title}";
-                    var body = $"Dear user,<br/>The event <b>{existing.Title}</b> you registered for has been updated. Please check the event details for changes.";
+                    var subject = $"Event Updated: {eventEntity.Title}";
+                    var body = $"Dear user,<br/>The event <b>{eventEntity.Title}</b> you registered for has been updated. Please check the event details for changes.";
                     await _notificationService.SendEmailAsync(reg.UserEmail, subject, body);
                 }
             }
 
-            return existing;
+            return eventEntity;
         }
 
         public async Task<bool> DeleteEventAsync(int id)
         {
-            var evt = await _eventRepository.GetEventByIdAsync(id);
-            if (evt == null)
-                return false;
-
-            await _eventRepository.DeleteEventAsync(id);
-            return true;
+            var result = await _eventRepository.DeleteEventAsync(id);
+            return result;
         }
 
 
