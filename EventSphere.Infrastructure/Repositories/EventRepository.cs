@@ -16,7 +16,7 @@ namespace EventSphere.Infrastructure.Repositories
         {
             _context = context;
         }
-         public async Task<Event?> GetEventByIdAsync(int id)
+        public async Task<Event?> GetEventByIdAsync(int id)
         {
             return await _context.Events
                 .Include(e => e.Speakers)
@@ -27,7 +27,7 @@ namespace EventSphere.Infrastructure.Repositories
                 .FirstOrDefaultAsync(e => e.EventId == id);
         }
 
-        
+
         public async Task<(IEnumerable<EventCardDto> Events, int TotalCount)> GetUnapprovedEventsPagedAsync(int page, int pageSize)
         {
             var query = _context.Events
@@ -47,7 +47,7 @@ namespace EventSphere.Infrastructure.Repositories
                     IsVerifiedByAdmin = e.IsVerifiedByAdmin,
                     RegistrationCount = e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0,
                     OrganizerEmail = e.OrganizerEmail
-                    
+
                 });
 
             var totalCount = await query.CountAsync();
@@ -61,109 +61,109 @@ namespace EventSphere.Infrastructure.Repositories
 
 
         public async Task<EventDto?> GetEventByIdNewAsync(int id)
-{
-    // Get the event (scalar fields only)
-    var evnt = await _context.Events
-        .AsNoTracking()
-        .FirstOrDefaultAsync(e => e.EventId == id);
-
-    if (evnt == null)
-        return null;
-
-    // FAQs
-    var faqs = await _context.EventFaqs
-        .AsNoTracking()
-        .Where(f => f.EventId == id)
-        .Select(f => new EventFaqDto
         {
-            FaqId = f.FaqId,
-            Question = f.Question,
-            Answer = f.Answer
-        })
-        .ToListAsync();
+            // Get the event (scalar fields only)
+            var evnt = await _context.Events
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.EventId == id);
 
-    // Speakers
-    var speakers = await _context.EventSpeakers
-        .AsNoTracking()
-        .Where(s => s.EventId == id)
-        .Select(s => new EventSpeakerDto
-        {
-            SpeakerId = s.SpeakerId,
-            Name = s.Name,
-            Bio = s.Bio,
-            PhotoUrl = s.PhotoUrl
-        })
-        .ToListAsync();
+            if (evnt == null)
+                return null;
 
-    // Occurrences
-    var occurrences = await _context.EventOccurrences
-        .AsNoTracking()
-        .Where(o => o.EventId == id)
-        .Select(o => new EventOccurrenceDto
-        {
-            OccurrenceId = o.OccurrenceId,
-            StartTime = o.StartTime,
-            EndTime = o.EndTime,
-            EventTitle = o.EventTitle,
-            IsCancelled = o.IsCancelled
-        })
-        .ToListAsync();
+            // FAQs
+            var faqs = await _context.EventFaqs
+                .AsNoTracking()
+                .Where(f => f.EventId == id)
+                .Select(f => new EventFaqDto
+                {
+                    FaqId = f.FaqId,
+                    Question = f.Question,
+                    Answer = f.Answer
+                })
+                .ToListAsync();
 
-    // Media
-    var media = await _context.EventMedias
-        .AsNoTracking()
-        .Where(m => m.EventId == id)
-        .Select(m => new EventMediaDto
-        {
-            MediaId = m.MediaId,
-            MediaUrl = m.MediaUrl,
-            MediaType = m.MediaType.ToString(),
-            Description = m.Description
-        })
-        .ToListAsync();
+            // Speakers
+            var speakers = await _context.EventSpeakers
+                .AsNoTracking()
+                .Where(s => s.EventId == id)
+                .Select(s => new EventSpeakerDto
+                {
+                    SpeakerId = s.SpeakerId,
+                    Name = s.Name,
+                    Bio = s.Bio,
+                    PhotoUrl = s.PhotoUrl
+                })
+                .ToListAsync();
 
-    // Registrations count
-    var registrationCount = await _context.Registrations
-        .AsNoTracking()
-        .CountAsync(r => r.EventId == id);
+            // Occurrences
+            var occurrences = await _context.EventOccurrences
+                .AsNoTracking()
+                .Where(o => o.EventId == id)
+                .Select(o => new EventOccurrenceDto
+                {
+                    OccurrenceId = o.OccurrenceId,
+                    StartTime = o.StartTime,
+                    EndTime = o.EndTime,
+                    EventTitle = o.EventTitle,
+                    IsCancelled = o.IsCancelled
+                })
+                .ToListAsync();
 
-    // Build DTO
-    var result = new EventDto
-    {
-        EventId = evnt.EventId,
-        OrganizerId = evnt.OrganizerId,
-        Title = evnt.Title,
-        CoverImage = evnt.CoverImage,
-        VibeVideoUrl = evnt.VibeVideoUrl,
-        Category = evnt.Category,
-        Location = evnt.Location,
-        EventType = evnt.EventType.ToString(),
-        RegistrationDeadline = evnt.RegistrationDeadline,
-        EventStart = evnt.EventStart,
-        EventEnd = evnt.EventEnd,
-        IsRecurring = evnt.IsRecurring,
-        RecurrenceType = evnt.RecurrenceType,
-        RecurrenceRule = evnt.RecurrenceRule,
-        CustomFields = evnt.CustomFields,
-        Description = evnt.Description,
-        IsPaidEvent = evnt.IsPaidEvent,
-        Price = evnt.Price,
-        EventLink = evnt.EventLink,
-        OrganizerName = evnt.OrganizerName,
-        OrganizerEmail = evnt.OrganizerEmail,
-        MaxAttendees = evnt.MaxAttendees,
-        EditEventCount = evnt.EditEventCount,
-        Occurrences = occurrences,
-        Speakers = speakers,
-        Faqs = faqs,
-        Media = media,
-        RegistrationCount = registrationCount,
-        IsVerifiedByAdmin = evnt.IsVerifiedByAdmin,
-        AdminVerifiedAt = evnt.AdminVerifiedAt ?? DateTime.MinValue
-    };
+            // Media
+            var media = await _context.EventMedias
+                .AsNoTracking()
+                .Where(m => m.EventId == id)
+                .Select(m => new EventMediaDto
+                {
+                    MediaId = m.MediaId,
+                    MediaUrl = m.MediaUrl,
+                    MediaType = m.MediaType.ToString(),
+                    Description = m.Description
+                })
+                .ToListAsync();
 
-    return result;
-}
+            // Registrations count
+            var registrationCount = await _context.Registrations
+                .AsNoTracking()
+                .CountAsync(r => r.EventId == id);
+
+            // Build DTO
+            var result = new EventDto
+            {
+                EventId = evnt.EventId,
+                OrganizerId = evnt.OrganizerId,
+                Title = evnt.Title,
+                CoverImage = evnt.CoverImage,
+                VibeVideoUrl = evnt.VibeVideoUrl,
+                Category = evnt.Category,
+                Location = evnt.Location,
+                EventType = evnt.EventType.ToString(),
+                RegistrationDeadline = evnt.RegistrationDeadline,
+                EventStart = evnt.EventStart,
+                EventEnd = evnt.EventEnd,
+                IsRecurring = evnt.IsRecurring,
+                RecurrenceType = evnt.RecurrenceType,
+                RecurrenceRule = evnt.RecurrenceRule,
+                CustomFields = evnt.CustomFields,
+                Description = evnt.Description,
+                IsPaidEvent = evnt.IsPaidEvent,
+                Price = evnt.Price,
+                EventLink = evnt.EventLink,
+                OrganizerName = evnt.OrganizerName,
+                OrganizerEmail = evnt.OrganizerEmail,
+                MaxAttendees = evnt.MaxAttendees,
+                EditEventCount = evnt.EditEventCount,
+                Occurrences = occurrences,
+                Speakers = speakers,
+                Faqs = faqs,
+                Media = media,
+                RegistrationCount = registrationCount,
+                IsVerifiedByAdmin = evnt.IsVerifiedByAdmin,
+                AdminVerifiedAt = evnt.AdminVerifiedAt ?? DateTime.MinValue
+            };
+
+            return result;
+        }
 
 
 
@@ -187,27 +187,27 @@ namespace EventSphere.Infrastructure.Repositories
         }
 
         public async Task<List<EventCardDto>> GetCurrentOrganizedEventsAsync(int organizerId)
-{
-    return await _context.Events
-        .Where(e => e.OrganizerId == organizerId && e.IsCompleted == 0)
-        .Select(e => new EventCardDto
         {
-            EventId = e.EventId,
-            Title = e.Title,
-            CoverImage = e.CoverImage,
-            Category = e.Category,
-            EventType = e.EventType,
-            Location = e.Location,
-            EditEventCount = e.EditEventCount,
-            RegistrationDeadline = e.RegistrationDeadline,
-            EventStart = e.EventStart,
-            EventEnd = e.EventEnd,
-            Price = e.Price,
-            IsVerifiedByAdmin = e.IsVerifiedByAdmin,
-            RegistrationCount = e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0
-        })
-        .ToListAsync();
-}
+            return await _context.Events
+                .Where(e => e.OrganizerId == organizerId && e.IsCompleted == 0)
+                .Select(e => new EventCardDto
+                {
+                    EventId = e.EventId,
+                    Title = e.Title,
+                    CoverImage = e.CoverImage,
+                    Category = e.Category,
+                    EventType = e.EventType,
+                    Location = e.Location,
+                    EditEventCount = e.EditEventCount,
+                    RegistrationDeadline = e.RegistrationDeadline,
+                    EventStart = e.EventStart,
+                    EventEnd = e.EventEnd,
+                    Price = e.Price,
+                    IsVerifiedByAdmin = e.IsVerifiedByAdmin,
+                    RegistrationCount = e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0
+                })
+                .ToListAsync();
+        }
 
 
         public async Task<List<Event>> GetUpcomingEventsAsync()
@@ -224,20 +224,20 @@ namespace EventSphere.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-public async Task<List<Event>> GetTrendingEventsAsync()
-{
-    var now = DateTime.UtcNow;
+        public async Task<List<Event>> GetTrendingEventsAsync()
+        {
+            var now = DateTime.UtcNow;
 
-    var events = await _context.Events
-        .Where(e => e.EventStart >= now && e.IsVerifiedByAdmin)
-        .Include(e => e.Registrations)
-        .ToListAsync();
+            var events = await _context.Events
+                .Where(e => e.EventStart >= now && e.IsVerifiedByAdmin)
+                .Include(e => e.Registrations)
+                .ToListAsync();
 
-    return events
-        .OrderByDescending(e => e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0)
-        .Take(10)
-        .ToList();
-}
+            return events
+                .OrderByDescending(e => e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0)
+                .Take(10)
+                .ToList();
+        }
 
 
 
@@ -335,100 +335,100 @@ public async Task<List<Event>> GetTrendingEventsAsync()
         }
 
         public async Task<IEnumerable<EventCardDto>> FilterEventsAsync(EventFilterDto filter)
-{
-    var query = _context.Events.AsQueryable();
-
-    // Apply filters
-    if (!string.IsNullOrEmpty(filter.Location))
-    {
-        var pattern = $"%{filter.Location.ToLower()}%";
-        query = query.Where(e => EF.Functions.Like((e.Location ?? "").ToLower(), pattern));
-    }
-
-    if (!string.IsNullOrEmpty(filter.Price))
-    {
-        if (filter.Price.Equals("free", StringComparison.OrdinalIgnoreCase))
         {
-            query = query.Where(e => e.Price == 0 || e.Price == null);
-        }
-        else if (filter.Price.Equals("paid", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.Price > 0);
-        }
-    }
+            var query = _context.Events.AsQueryable();
 
-    if (filter.Date.HasValue)
-        query = query.Where(e => filter.Date.Value >= e.EventStart && filter.Date.Value <= e.EventEnd);
+            // Apply filters
+            if (!string.IsNullOrEmpty(filter.Location))
+            {
+                var pattern = $"%{filter.Location.ToLower()}%";
+                query = query.Where(e => EF.Functions.Like((e.Location ?? "").ToLower(), pattern));
+            }
 
-    if (!string.IsNullOrEmpty(filter.Category))
-    {
-        var standardCategories = new List<string>
+            if (!string.IsNullOrEmpty(filter.Price))
+            {
+                if (filter.Price.Equals("free", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.Price == 0 || e.Price == null);
+                }
+                else if (filter.Price.Equals("paid", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.Price > 0);
+                }
+            }
+
+            if (filter.Date.HasValue)
+                query = query.Where(e => filter.Date.Value >= e.EventStart && filter.Date.Value <= e.EventEnd);
+
+            if (!string.IsNullOrEmpty(filter.Category))
+            {
+                var standardCategories = new List<string>
         {
             "Music", "Tech", "Health", "Education", "Business", "Conference", "Exhibitions"
         };
 
-        if (filter.Category.Equals("others", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.Category != null && !standardCategories.Contains(e.Category));
-        }
-        else
-        {
-            query = query.Where(e => e.Category == filter.Category);
-        }
-    }
+                if (filter.Category.Equals("others", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.Category != null && !standardCategories.Contains(e.Category));
+                }
+                else
+                {
+                    query = query.Where(e => e.Category == filter.Category);
+                }
+            }
 
-    if (!string.IsNullOrEmpty(filter.RecurrenceType))
-    {
-        if (filter.RecurrenceType.Equals("onetime", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.RecurrenceType == "None");
-        }
-        else if (filter.RecurrenceType.Equals("multiple", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.RecurrenceType != null && e.RecurrenceType != "None");
-        }
-        else
-        {
-            query = query.Where(e => e.RecurrenceType == filter.RecurrenceType);
-        }
-    }
+            if (!string.IsNullOrEmpty(filter.RecurrenceType))
+            {
+                if (filter.RecurrenceType.Equals("onetime", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.RecurrenceType == "None");
+                }
+                else if (filter.RecurrenceType.Equals("multiple", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.RecurrenceType != null && e.RecurrenceType != "None");
+                }
+                else
+                {
+                    query = query.Where(e => e.RecurrenceType == filter.RecurrenceType);
+                }
+            }
 
-    if (!string.IsNullOrEmpty(filter.EventType))
-    {
-        if (filter.EventType.Equals("online", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.EventType == EventSphere.Domain.Enums.EventType.Online);
-        }
-        else if (filter.EventType.Equals("offline", StringComparison.OrdinalIgnoreCase))
-        {
-            query = query.Where(e => e.EventType != EventSphere.Domain.Enums.EventType.Online);
-        }
-    }
+            if (!string.IsNullOrEmpty(filter.EventType))
+            {
+                if (filter.EventType.Equals("online", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.EventType == EventSphere.Domain.Enums.EventType.Online);
+                }
+                else if (filter.EventType.Equals("offline", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(e => e.EventType != EventSphere.Domain.Enums.EventType.Online);
+                }
+            }
 
-    var now = DateTime.UtcNow;
-    query = query.Where(e => e.EventStart >= now)
-                 .OrderBy(e => e.EventStart);
+            var now = DateTime.UtcNow;
+            query = query.Where(e => e.EventStart >= now)
+                         .OrderBy(e => e.EventStart);
 
-    return await query
-        .Select(e => new EventCardDto
-        {
-            EventId = e.EventId,
-            Title = e.Title,
-            CoverImage = e.CoverImage ?? string.Empty,
-            Category = e.Category ?? string.Empty,
-            EventType = e.EventType,
-            Location = e.Location,
-            EditEventCount = e.EditEventCount,
-            RegistrationDeadline = e.RegistrationDeadline,
-            EventStart = e.EventStart,
-            EventEnd = e.EventEnd,
-            Price = e.Price,
-            RegistrationCount = e.Registrations != null ? e.Registrations.Count : 0, // ✅ COUNT of related registrations
-            IsVerifiedByAdmin = e.IsVerifiedByAdmin,
-            OrganizerEmail = e.OrganizerEmail
-        })
-        .ToListAsync();
-}
+            return await query
+                .Select(e => new EventCardDto
+                {
+                    EventId = e.EventId,
+                    Title = e.Title,
+                    CoverImage = e.CoverImage ?? string.Empty,
+                    Category = e.Category ?? string.Empty,
+                    EventType = e.EventType,
+                    Location = e.Location,
+                    EditEventCount = e.EditEventCount,
+                    RegistrationDeadline = e.RegistrationDeadline,
+                    EventStart = e.EventStart,
+                    EventEnd = e.EventEnd,
+                    Price = e.Price,
+                    RegistrationCount = e.Registrations != null ? e.Registrations.Count : 0, // ✅ COUNT of related registrations
+                    IsVerifiedByAdmin = e.IsVerifiedByAdmin,
+                    OrganizerEmail = e.OrganizerEmail
+                })
+                .ToListAsync();
+        }
 
 
         public async Task<Dictionary<int, int>> GetRegistrationCountsForEventsAsync(List<int> eventIds)
@@ -451,7 +451,7 @@ public async Task<List<Event>> GetTrendingEventsAsync()
                 .Select(e => (int?)e.EditEventCount)
                 .FirstOrDefaultAsync();
         }
-        
+
 
 
         // Get all registrations for an event (for notifications)
@@ -470,5 +470,98 @@ public async Task<List<Event>> GetTrendingEventsAsync()
                 .Distinct()
                 .ToListAsync();
         }
+        
+
+        public async Task<(IEnumerable<EventCardDto> Events, int TotalCount)> FilterEventsPagedAsync(EventFilterDto filter, int page = 1, int pageSize = 20)
+{
+    var query = _context.Events.AsNoTracking().AsQueryable();
+
+    // Apply filters
+    if (!string.IsNullOrEmpty(filter.Location))
+    {
+        var pattern = $"%{filter.Location.ToLower()}%";
+        query = query.Where(e => EF.Functions.Like((e.Location ?? "").ToLower(), pattern));
+    }
+    if (!string.IsNullOrEmpty(filter.Price))
+    {
+        if (filter.Price.Equals("free", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.Price == 0 || e.Price == null);
+        }
+        else if (filter.Price.Equals("paid", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.Price > 0);
+        }
+    }
+    if (filter.Date.HasValue)
+        query = query.Where(e => filter.Date.Value >= e.EventStart && filter.Date.Value <= e.EventEnd);
+    if (!string.IsNullOrEmpty(filter.Category))
+    {
+        var standardCategories = new List<string>
+        {
+            "Music", "Tech", "Health", "Education", "Business", "Conference", "Exhibitions"
+        };
+        if (filter.Category.Equals("others", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.Category != null && !standardCategories.Contains(e.Category));
+        }
+        else
+        {
+            query = query.Where(e => e.Category == filter.Category);
+        }
+    }
+    if (!string.IsNullOrEmpty(filter.RecurrenceType))
+    {
+        if (filter.RecurrenceType.Equals("onetime", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.RecurrenceType == "None");
+        }
+        else if (filter.RecurrenceType.Equals("multiple", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.RecurrenceType != null && e.RecurrenceType != "None");
+        }
+        else
+        {
+            query = query.Where(e => e.RecurrenceType == filter.RecurrenceType);
+        }
+    }
+    if (!string.IsNullOrEmpty(filter.EventType))
+    {
+        if (filter.EventType.Equals("online", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.EventType == EventType.Online);
+        }
+        else if (filter.EventType.Equals("offline", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => e.EventType != EventType.Online);
+        }
+    }
+    var now = DateTime.UtcNow;
+    query = query.Where(e => e.EventStart >= now)
+                 .OrderBy(e => e.EventStart);
+    var totalCount = await query.CountAsync();
+    var events = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(e => new EventCardDto
+        {
+            EventId = e.EventId,
+            Title = e.Title,
+            CoverImage = e.CoverImage ?? string.Empty,
+            Category = e.Category ?? string.Empty,
+            EventType = e.EventType,
+            Location = e.Location,
+            EditEventCount = e.EditEventCount,
+            RegistrationDeadline = e.RegistrationDeadline,
+            EventStart = e.EventStart,
+            EventEnd = e.EventEnd,
+            Price = e.Price,
+            RegistrationCount = e.Registrations != null ? e.Registrations.Sum(r => r.TicketCount) : 0,
+            IsVerifiedByAdmin = e.IsVerifiedByAdmin,
+            OrganizerEmail = e.OrganizerEmail
+        })
+        .ToListAsync();
+    return (events, totalCount);
+}
     }
 }

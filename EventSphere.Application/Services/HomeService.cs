@@ -30,26 +30,31 @@ namespace backend.Services
         }
 
         public async Task<IEnumerable<EventCardDto>> GetUpcomingEventsAsync()
-{
-    var events = await _eventRepository.GetUpcomingEventsAsync();
-    return events.Select(EventMapper.ToCardDto).ToList();
-}
+        {
+            var events = await _eventRepository.GetUpcomingEventsAsync();
+            return events.Select(EventMapper.ToCardDto).ToList();
+        }
 
         public async Task<IEnumerable<EventCardDto>> GetTrendingEventsAsync()
-{
-    var events = await _eventRepository.GetTrendingEventsAsync();
-    return events.Select(EventMapper.ToCardDto).ToList();
-}
+        {
+            var events = await _eventRepository.GetTrendingEventsAsync();
+            return events.Select(EventMapper.ToCardDto).ToList();
+        }
 
 
         public async Task<IEnumerable<EventCardDto>> FilterEventsAsync(EventFilterDto filter)
-{
-    var events = await _eventRepository.FilterEventsAsync(filter);
+        {
+            var events = await _eventRepository.FilterEventsAsync(filter);
 
             return events;
-}
+        }
 
 
+
+public async Task<(IEnumerable<EventCardDto> Events, int TotalCount)> FilterEventsPagedAsync(EventFilterDto filter, int page = 1, int pageSize = 20)
+        {
+            return await _eventRepository.FilterEventsPagedAsync(filter, page, pageSize);
+        }
 
 
     }

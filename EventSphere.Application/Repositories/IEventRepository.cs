@@ -12,9 +12,9 @@ namespace EventSphere.Application.Repositories
         Task<Event?> GetEventByIdAsync(int id);
 
         Task<IEnumerable<Event>> GetAllEventsAsync();
-    Task<(IEnumerable<Event> Events, int TotalCount)> GetEventsPagedAsync(int page, int pageSize);
+        Task<(IEnumerable<Event> Events, int TotalCount)> GetEventsPagedAsync(int page, int pageSize);
 
-    Task<List<EventCardDto>> GetCurrentOrganizedEventsAsync(int organizerId);
+        Task<List<EventCardDto>> GetCurrentOrganizedEventsAsync(int organizerId);
 
         Task AddEventAsync(Event ev);
         Task UpdateEventAsync(Event ev);
@@ -23,7 +23,7 @@ namespace EventSphere.Application.Repositories
         Task<List<Event>> GetTrendingEventsAsync();
 
 
-    Task<bool> DeleteEventAsync(int id);
+        Task<bool> DeleteEventAsync(int id);
         // Add more event-related methods as needed
 
         Task<int> GetRegistrationCountForEventAsync(int eventId);
@@ -33,14 +33,16 @@ namespace EventSphere.Application.Repositories
 
         Task<int?> GetEventEditCountAsync(int eventId);
 
-    Task<List<int>> GetRegisteredEventIdsByUserIdAsync(int userId);
+        Task<List<int>> GetRegisteredEventIdsByUserIdAsync(int userId);
 
-    // Get all registrations for an event (for notifications)
-    Task<List<Registration>> GetRegistrationsByEventIdAsync(int eventId);
+        // Get all registrations for an event (for notifications)
+        Task<List<Registration>> GetRegistrationsByEventIdAsync(int eventId);
 
-    // Optimized method for admin page: get unapproved events paged
-    Task<(IEnumerable<EventCardDto> Events, int TotalCount)> GetUnapprovedEventsPagedAsync(int page, int pageSize);
+        // Optimized method for admin page: get unapproved events paged
+        Task<(IEnumerable<EventCardDto> Events, int TotalCount)> GetUnapprovedEventsPagedAsync(int page, int pageSize);
 
+
+        Task<(IEnumerable<EventCardDto> Events, int TotalCount)> FilterEventsPagedAsync(EventFilterDto filter, int page = 1, int pageSize = 20);
 
     }
 }

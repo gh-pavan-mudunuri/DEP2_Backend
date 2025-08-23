@@ -34,11 +34,20 @@ namespace EventSphere.API.Controllers
         }
 
         [HttpPost("filter")]
-[AllowAnonymous]
-public async Task<IActionResult> FilterEvents([FromBody] EventFilterDto filter)
-{
-    var events = await _homeService.FilterEventsAsync(filter);
-    return Ok(new { success = true, data = events });
-}
+        [AllowAnonymous]
+        public async Task<IActionResult> FilterEvents([FromBody] EventFilterDto filter)
+        {
+            var events = await _homeService.FilterEventsAsync(filter);
+            return Ok(new { success = true, data = events });
+        }
+
+
+[HttpPost("filter-paged")]
+        [AllowAnonymous]
+        public async Task<IActionResult> FilterEventsPaged([FromBody] EventFilterDto filter, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            var (events, totalCount) = await _homeService.FilterEventsPagedAsync(filter, page, pageSize);
+            return Ok(new { success = true, data = events, totalCount });
+        }
     }
 }
