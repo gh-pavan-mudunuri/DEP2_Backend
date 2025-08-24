@@ -1,3 +1,4 @@
+// ...existing code...
 using EventSphere.Domain.Enums;
 using EventSphere.Domain.Entities;
 using backend.Dtos;
@@ -14,14 +15,16 @@ namespace backend.Services
 {
     public class UserService : IUserService
     {
-        private readonly EventSphere.Application.Repositories.IAuthRepository _authRepository;
-        private readonly IConfiguration _config;
-        private readonly IFileService _fileService;
-        public UserService(EventSphere.Application.Repositories.IAuthRepository authRepository, IConfiguration config, IFileService fileService)
+    private readonly EventSphere.Application.Repositories.IAuthRepository _authRepository;
+    private readonly IConfiguration _config;
+    private readonly IFileService _fileService;
+    private readonly ILogger<UserService> _logger;
+        public UserService(EventSphere.Application.Repositories.IAuthRepository authRepository, IConfiguration config, IFileService fileService, ILogger<UserService> logger)
         {
             _authRepository = authRepository;
             _config = config;
             _fileService = fileService;
+            _logger = logger;
         }
 
         public async Task<bool> UpdateUserDetailsWithImageAsync(int id, string? name, string? email, string? phoneNumber, string? profileImagePath)
@@ -73,22 +76,60 @@ namespace backend.Services
         {
             // Validate username
             if (string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Length < 3)
-                throw new ArgumentException("Invalid name. Must be at least 3 characters.");
+            {
+                try
+                {
+                    throw new ArgumentException("Invalid name. Must be at least 3 characters.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Invalid name. Must be at least 3 characters.");
+                    throw;
+                }
+            }
             // Validate email
             if (string.IsNullOrWhiteSpace(dto.Email) || !dto.Email.Contains("@"))
-                throw new ArgumentException("Invalid email address.");
+            {
+                try
+                {
+                    throw new ArgumentException("Invalid email address.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Invalid email address.");
+                    throw;
+                }
+            }
             // Check if user already exists
             var existingUser = await _authRepository.GetUserByEmailAsync(dto.Email);
             if (existingUser != null)
             {
                 if (existingUser.IsEmailVerified)
-                    throw new Exception("Email already registered. Please Login.");
+                {
+                    try
+                    {
+                        throw new Exception("Email already registered. Please Login.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Email already registered. Please Login.");
+                        throw;
+                    }
+                }
                 // Resend verification email for unverified user
                 existingUser.EmailVerificationToken = Guid.NewGuid().ToString();
                 existingUser.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
                 await _authRepository.UpdateUserAsync(existingUser);
                 SendVerificationEmail(existingUser.Email, existingUser.Name, existingUser.EmailVerificationToken);
-                throw new Exception("A verification email has been resent. Please check your inbox.");
+                try
+                {
+                    throw new Exception("A verification email has been resent. Please check your inbox.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "A verification email has been resent. Please check your inbox.");
+                    throw;
+                }
             }
 
             ValidatePassword(dto.Password);
@@ -116,9 +157,29 @@ namespace backend.Services
         {
             var user = await _authRepository.GetUserByEmailAsync(dto.Email);
             if (user == null || !VerifyPassword(dto.Password, user.PasswordHash))
-                throw new Exception("Email or Password is incorrect.");
+            {
+                try
+                {
+                    throw new Exception("Email or Password is incorrect.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Email or Password is incorrect.");
+                    throw;
+                }
+            }
             if (!user.IsEmailVerified)
-                throw new Exception("Email not verified. Please check your inbox for the verification link.");
+            {
+                try
+                {
+                    throw new Exception("Email not verified. Please check your inbox for the verification link.");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Email not verified. Please check your inbox for the verification link.");
+                    throw;
+                }
+            }
  
             // Generate JWT token
             var jwtKey = _config["Jwt:Key"] ?? "supersecretkey";
@@ -169,7 +230,18 @@ namespace backend.Services
         public async Task<object> GetPreferencesAsync(int userId)
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
-            if (user == null) throw new Exception("User not found");
+            if (user == null)
+            {
+                try
+                {
+                    throw new Exception("User not found");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "User not found for UserId: {UserId}", userId);
+                    throw;
+                }
+            }
             if (string.IsNullOrEmpty(user.ProfileImage)) return new { };
             return JsonSerializer.Deserialize<object>(user.ProfileImage)!;
         }
@@ -177,7 +249,18 @@ namespace backend.Services
         public async Task<bool> SetPreferencesAsync(int userId, object preferences)
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
-            if (user == null) throw new Exception("User not found");
+            if (user == null)
+            {
+                try
+                {
+                    throw new Exception("User not found");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "User not found for UserId: {UserId}", userId);
+                    throw;
+                }
+            }
             user.ProfileImage = JsonSerializer.Serialize(preferences);
             await _authRepository.UpdateUserAsync(user);
             return true;
@@ -186,7 +269,18 @@ namespace backend.Services
         public async Task<object> GetNotificationSettingsAsync(int userId)
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
-            if (user == null) throw new Exception("User not found");
+            if (user == null)
+            {
+                try
+                {
+                    throw new Exception("User not found");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "User not found for UserId: {UserId}", userId);
+                    throw;
+                }
+            }
             if (string.IsNullOrEmpty(user.Phone)) return new { };
             return JsonSerializer.Deserialize<object>(user.Phone)!;
         }
@@ -194,7 +288,18 @@ namespace backend.Services
         public async Task<bool> UpdateNotificationSettingsAsync(int userId, object settings)
         {
             var user = await _authRepository.GetUserByIdAsync(userId);
-            if (user == null) throw new Exception("User not found");
+            if (user == null)
+            {
+                try
+                {
+                    throw new Exception("User not found");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "User not found for UserId: {UserId}", userId);
+                    throw;
+                }
+            }
             user.Phone = JsonSerializer.Serialize(settings);
             await _authRepository.UpdateUserAsync(user);
             return true;
