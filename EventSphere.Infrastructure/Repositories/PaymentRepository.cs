@@ -21,19 +21,27 @@ namespace EventSphere.Infrastructure.Repositories
         /// </summary>
         public async Task<bool> IsStripeAccountOnboardingCompleteAsync(string stripeAccountId)
         {
-            StripeConfiguration.ApiKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
+            var secretKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
+            if (string.IsNullOrWhiteSpace(secretKey))
+            {
+                _logger.LogError("Stripe secret key not found in environment variables. Set STRIPE_SECRET_KEY in your .env or configuration.");
+                throw new InvalidOperationException("Stripe secret key not found in environment variables. Set STRIPE_SECRET_KEY in your .env or configuration.");
+            }
+            StripeConfiguration.ApiKey = secretKey;
             var accountService = new Stripe.AccountService();
             var account = await accountService.GetAsync(stripeAccountId);
             // Stripe recommends checking payouts_enabled for Express accounts
             return account.PayoutsEnabled;
         }
-        private readonly IConfiguration _configuration;
-        private readonly AppDbContext _dbContext;
+    private readonly IConfiguration _configuration;
+    private readonly AppDbContext _dbContext;
+    private readonly ILogger<PaymentRepository> _logger;
 
-        public PaymentRepository(IConfiguration configuration, AppDbContext dbContext)
+        public PaymentRepository(IConfiguration configuration, AppDbContext dbContext, ILogger<PaymentRepository> logger)
         {
             _configuration = configuration;
             _dbContext = dbContext;
+            _logger = logger;
             // Set Stripe API key from environment variable
             var stripeSecretKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
             if (!string.IsNullOrWhiteSpace(stripeSecretKey))
@@ -85,92 +93,169 @@ namespace EventSphere.Infrastructure.Repositories
             if (payment == null)
                 return true; // No payment yet, session is valid
             // If payment is marked as Success, session is not valid anymore
-            return payment.Status != EventSphere.Domain.Enums.PaymentResultStatus.Success;
+            return payment.Status != PaymentResultStatus.Success;
         }
      
 
         public async Task<PaymentResponseDto> CreatePaymentIntentAsync(PaymentRequestDto request)
-        {    StripeConfiguration.ApiKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
-            // Validate required fields
-            var eventDetails = await _dbContext.Events.FindAsync((int)request.EventId);
-            if (eventDetails == null)
-                throw new KeyNotFoundException($"Event with ID {request.EventId} not found.");
-            if (eventDetails.Price == null)
-                throw new InvalidOperationException($"Event with ID {request.EventId} does not have a valid price.");
-
-            if (request.UserId <= 0 || request.EventId <= 0 || request.TicketCount <= 0)
-                throw new InvalidOperationException("Invalid registration/payment details. UserId, EventId, and TicketCount must be positive integers.");
-
-            // Allow multiple registrations for the same user and event (no duplicate check)
-
-            // Validate event status (not cancelled or ended)
-            var eventType = eventDetails.GetType();
-            var statusProp = eventType.GetProperty("Status");
-            if (statusProp != null)
+        {
+            StripeConfiguration.ApiKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
+            try
             {
-                var statusValue = statusProp.GetValue(eventDetails)?.ToString()?.ToLower();
-                if (statusValue == "cancelled")
-                    throw new InvalidOperationException("Event is cancelled.");
-            }
-            var endTimeProp = eventType.GetProperty("EndTime");
-            if (endTimeProp != null)
-            {
-                var endTimeValue = endTimeProp.GetValue(eventDetails) as DateTime?;
-                if (endTimeValue != null && endTimeValue < DateTime.UtcNow)
-                    throw new InvalidOperationException("Event has already ended.");
-            }
-
-            // Attendee limit check
-            if (eventDetails.MaxAttendees.HasValue)
-            {
-                int currentAttendees = await _dbContext.Registrations
-                    .CountAsync(r => r.EventId == (int)request.EventId);
-                if (currentAttendees + request.TicketCount > eventDetails.MaxAttendees.Value)
+                // Validate required fields
+                var eventDetails = await _dbContext.Events.FindAsync((int)request.EventId);
+                if (eventDetails == null)
                 {
-                    throw new InvalidOperationException($"Cannot register: Max attendees limit ({eventDetails.MaxAttendees.Value}) reached for event {request.EventId}.");
+                    try
+                    {
+                        throw new KeyNotFoundException($"Event with ID {request.EventId} not found.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Event with ID {EventId} not found.", request.EventId);
+                        throw;
+                    }
                 }
-            }
+                if (eventDetails.Price == null)
+                {
+                    try
+                    {
+                        throw new InvalidOperationException($"Event with ID {request.EventId} does not have a valid price.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Event with ID {EventId} does not have a valid price.", request.EventId);
+                        throw;
+                    }
+                }
 
-            var correctAmount = eventDetails.Price.Value * request.TicketCount;
+                if (request.UserId <= 0 || request.EventId <= 0 || request.TicketCount <= 0)
+                {
+                    try
+                    {
+                        throw new InvalidOperationException("Invalid registration/payment details. UserId, EventId, and TicketCount must be positive integers.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Invalid registration/payment details. UserId, EventId, and TicketCount must be positive integers.");
+                        throw;
+                    }
+                }
 
-            // Fetch the event organizer's StripeAccountId
-            var organizer = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.UserId == eventDetails.OrganizerId);
-            string? organizerStripeAccountId = organizer?.StripeAccountId;
-            if (string.IsNullOrWhiteSpace(organizerStripeAccountId))
-                throw new InvalidOperationException("Event organizer does not have a Stripe account set up.");
+                // Allow multiple registrations for the same user and event (no duplicate check)
+
+                // Validate event status (not cancelled or ended)
+                var eventType = eventDetails.GetType();
+                var statusProp = eventType.GetProperty("Status");
+                if (statusProp != null)
+                {
+                    var statusValue = statusProp.GetValue(eventDetails)?.ToString()?.ToLower();
+                    if (statusValue == "cancelled")
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException("Event is cancelled.");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Event is cancelled.");
+                            throw;
+                        }
+                    }
+                }
+                var endTimeProp = eventType.GetProperty("EndTime");
+                if (endTimeProp != null)
+                {
+                    var endTimeValue = endTimeProp.GetValue(eventDetails) as DateTime?;
+                    if (endTimeValue != null && endTimeValue < DateTime.UtcNow)
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException("Event has already ended.");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Event has already ended.");
+                            throw;
+                        }
+                    }
+                }
+
+                // Attendee limit check
+                if (eventDetails.MaxAttendees.HasValue)
+                {
+                    int currentAttendees = await _dbContext.Registrations
+                        .CountAsync(r => r.EventId == (int)request.EventId);
+                    if (currentAttendees + request.TicketCount > eventDetails.MaxAttendees.Value)
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException($"Cannot register: Max attendees limit ({eventDetails.MaxAttendees.Value}) reached for event {request.EventId}.");
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Cannot register: Max attendees limit ({MaxAttendees}) reached for event {EventId}.", eventDetails.MaxAttendees.Value, request.EventId);
+                            throw;
+                        }
+                    }
+                }
+
+                var correctAmount = eventDetails.Price.Value * request.TicketCount;
+
+                // Fetch the event organizer's StripeAccountId
+                var organizer = await _dbContext.Users
+                    .FirstOrDefaultAsync(u => u.UserId == eventDetails.OrganizerId);
+                string? organizerStripeAccountId = organizer?.StripeAccountId;
+                if (string.IsNullOrWhiteSpace(organizerStripeAccountId))
+                {
+                    try
+                    {
+                        throw new InvalidOperationException("Event organizer does not have a Stripe account set up.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Event organizer does not have a Stripe account set up.");
+                        throw;
+                    }
+                }
                 Console.WriteLine($"[PAYMENT] Routing payment to organizer StripeAccountId: {organizerStripeAccountId}");
 
-            // Set application fee (platform fee) as 10% of the transaction amount
-            long applicationFeeAmount = (long)((double)correctAmount * 0.10 * 100); // 10% commission, in paise/cents
+                // Set application fee (platform fee) as 10% of the transaction amount
+                long applicationFeeAmount = (long)((double)correctAmount * 0.10 * 100); // 10% commission, in paise/cents
 
-            var options = new PaymentIntentCreateOptions
+                var options = new PaymentIntentCreateOptions
+                {
+                    Amount = (long)(correctAmount * 100), // Convert to paise/cents
+                    Currency = "inr",
+                    TransferData = new PaymentIntentTransferDataOptions
+                    {
+                        Destination = organizerStripeAccountId
+                    },
+                    ApplicationFeeAmount = applicationFeeAmount,
+                    AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
+                    {
+                        Enabled = true,
+                    },
+                    Metadata = new Dictionary<string, string>
+                    {
+                        { "userId", request.UserId.ToString() },
+                        { "eventId", request.EventId.ToString() },
+                        { "ticketCount", request.TicketCount.ToString() },
+                        { "email", string.IsNullOrWhiteSpace(request.Email) ? "" : request.Email }
+                    },
+                    ReceiptEmail = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email
+                };
+
+                var service = new PaymentIntentService();
+                var paymentIntent = await service.CreateAsync(options);
+
+                return new PaymentResponseDto { ClientSecret = paymentIntent.ClientSecret };
+            }
+            catch (Exception ex)
             {
-                Amount = (long)(correctAmount * 100), // Convert to paise/cents
-                Currency = "inr",
-                TransferData = new PaymentIntentTransferDataOptions
-                {
-                    Destination = organizerStripeAccountId
-                },
-                ApplicationFeeAmount = applicationFeeAmount,
-                AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
-                {
-                    Enabled = true,
-                },
-                Metadata = new Dictionary<string, string>
-                {
-                    { "userId", request.UserId.ToString() },
-                    { "eventId", request.EventId.ToString() },
-                    { "ticketCount", request.TicketCount.ToString() },
-                       { "email", string.IsNullOrWhiteSpace(request.Email) ? "" : request.Email }
-                },
-                ReceiptEmail = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email
-            };
-
-            var service = new PaymentIntentService();
-            var paymentIntent = await service.CreateAsync(options);
-
-            return new PaymentResponseDto { ClientSecret = paymentIntent.ClientSecret };
+                _logger.LogError(ex, "Error creating payment intent for EventId: {EventId}", request.EventId);
+                throw;
+            }
         }
 
         public async Task<CheckoutSessionResponseDto> CreateCheckoutSessionAsync(CheckoutSessionRequestDto request)
@@ -206,8 +291,9 @@ namespace EventSphere.Infrastructure.Repositories
                     Console.WriteLine($"[PAYMENT] Routing payment to organizer StripeAccountId: {organizerStripeAccountId}");
 
                 // Ensure SuccessUrl and CancelUrl are valid URLs
-                string successUrl = request != null && !string.IsNullOrWhiteSpace(request.SuccessUrl) ? request.SuccessUrl : "dep-2-frontend.vercel.app/payment-success";
-                string cancelUrl = request != null && !string.IsNullOrWhiteSpace(request.CancelUrl) ? request.CancelUrl : "dep-2-frontend.vercel.app/payment-cancel";
+                var frontendBaseUrl = _configuration["Frontend:Url"] ?? "http://localhost:3000";
+                string successUrl = request != null && !string.IsNullOrWhiteSpace(request.SuccessUrl) ? request.SuccessUrl : frontendBaseUrl.TrimEnd('/') + "/payment-success";
+                string cancelUrl = request != null && !string.IsNullOrWhiteSpace(request.CancelUrl) ? request.CancelUrl : frontendBaseUrl.TrimEnd('/') + "/payment-cancel";
 
                 // Diagnostic: throw if URLs are not valid
                 if (!successUrl.StartsWith("http://") && !successUrl.StartsWith("https://"))
@@ -317,7 +403,7 @@ namespace EventSphere.Infrastructure.Repositories
                     payment = new EventSphere.Domain.Entities.Payment
                     {
                         TransactionId = paymentIntentId,
-                        Status = status == "succeeded" ? EventSphere.Domain.Enums.PaymentResultStatus.Success : EventSphere.Domain.Enums.PaymentResultStatus.Failed,
+                        Status = status == "succeeded" ? PaymentResultStatus.Success : PaymentResultStatus.Failed,
                         Amount = amount,
                         PaymentTime = DateTime.UtcNow,
                         UserId = userId,
@@ -338,7 +424,7 @@ namespace EventSphere.Infrastructure.Repositories
             {
                 var oldStatus = payment.Status;
                 var oldAmount = payment.Amount;
-                payment.Status = status == "succeeded" ? EventSphere.Domain.Enums.PaymentResultStatus.Success : EventSphere.Domain.Enums.PaymentResultStatus.Failed;
+                payment.Status = status == "succeeded" ? PaymentResultStatus.Success : PaymentResultStatus.Failed;
                 payment.TransactionId = transactionId;
                 payment.Amount = amount;
                 payment.PaymentTime = DateTime.UtcNow;
@@ -357,7 +443,7 @@ namespace EventSphere.Infrastructure.Repositories
                 .FirstOrDefaultAsync();
             if (registration != null)
             {
-                registration.PayStatus = EventSphere.Domain.Enums.PaymentStatus.Paid;
+                registration.PayStatus = PaymentStatus.Paid;
                 registration.PaymentId = payment.PaymentId;
                 await _dbContext.SaveChangesAsync();
             }
@@ -376,8 +462,8 @@ namespace EventSphere.Infrastructure.Repositories
                     {
                         UserId = userId,
                         EventId = (int)eventId,
-                        Status = EventSphere.Domain.Enums.RegistrationStatus.Registered,
-                        PayStatus = EventSphere.Domain.Enums.PaymentStatus.Paid,
+                        Status = RegistrationStatus.Registered,
+                        PayStatus = PaymentStatus.Paid,
                         RegisteredAt = DateTime.UtcNow,
                         // OccurrenceId = occurrence.OccurrenceId,
                         // TicketId = ticket.TicketId
@@ -412,7 +498,13 @@ namespace EventSphere.Infrastructure.Repositories
                     {
                         using (var smtpClient = new System.Net.Mail.SmtpClient())
                         {
-                            smtpClient.Host = _configuration["Smtp:Host"] ?? "smtp.example.com";
+                            var smtpHost = _configuration["Smtp:Host"];
+                            if (string.IsNullOrEmpty(smtpHost))
+                            {
+                                _logger.LogError("SMTP host is not configured. Please set Smtp:Host in configuration.");
+                                throw new InvalidOperationException("SMTP host is not configured.");
+                            }
+                            smtpClient.Host = smtpHost;
                             smtpClient.Port = int.TryParse(_configuration["Smtp:Port"], out var port) ? port : 587;
                             smtpClient.EnableSsl = true;
                             smtpClient.Credentials = new System.Net.NetworkCredential(
@@ -496,7 +588,13 @@ namespace EventSphere.Infrastructure.Repositories
                 Console.WriteLine($"[EMAIL][TEST] Attempting to send test email to {toEmail}");
                 using (var smtpClient = new System.Net.Mail.SmtpClient())
                 {
-                    smtpClient.Host = _configuration["Smtp:Host"] ?? "smtp.example.com";
+                    var smtpHost = _configuration["Smtp:Host"];
+                    if (string.IsNullOrEmpty(smtpHost))
+                    {
+                        _logger.LogError("SMTP host is not configured. Please set Smtp:Host in configuration.");
+                        throw new InvalidOperationException("SMTP host is not configured.");
+                    }
+                    smtpClient.Host = smtpHost;
                     smtpClient.Port = int.TryParse(_configuration["Smtp:Port"], out var port) ? port : 587;
                     smtpClient.EnableSsl = true;
                     smtpClient.Credentials = new System.Net.NetworkCredential(
